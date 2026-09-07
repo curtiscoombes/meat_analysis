@@ -7,6 +7,7 @@ library(lubridate)
 library(here)
 library(usethis)
 
+# -----------------------------------------------------------------------------
 # Read in the data
 meat <- read_csv(here("Data", "Raw", "meat_consumption.csv"))
 
@@ -18,9 +19,12 @@ use_github()
 head(meat)
 str(meat)
 
+# ------------------------------------------------------------------------------
 # Clean the data's names using Janitor
 meat <- meat|>
-  clean_names()
+  clean_names()|>
+  filter(time < 2026)|>
+  filter(value > 1)
 
 # Understanding the individual countries, as some may overlap
 meat|>
@@ -35,16 +39,50 @@ meat|>
   summarise(mean = mean(value))|>
   arrange(desc(mean))
 
-# Let's filter the data to only Great Britain, and given the multiple recorded
+# ------------------------------------------------------------------------------
+
+# Let's filter the data to only Great Britain, and only the ruminants as the unit
+# is different for ruminents and for poultry. Also, given the multiple recorded
 # and given that there's multiple, kinda conflicting entries per year, let's
 # find the average for them
-meat_filtered_gbr <- meat_filtered|>
+ruminant_filt_gbr <- meat|>
   group_by(subject, time)|>
   filter(location == "GBR")|>
-  summarise(year_avg = mean(value))
-  
+  filter(subject %in% c("BEEF", "SHEEP", "PIG"))|>
+  summarise(year_avg = mean(value))|>
+  ungroup()
 
-## Create a line plot which shows the average consumption per year, per animal
-ggplot(meat_filtered_gbr, aes(x = time, y = year_avg, color = subject))+
-  geom_line()+
-  labs(x = "Year", y = "Average Amount Per Year")
+## Create a line plot which shows the average consumption per year, per ruminant
+ggplot(ruminant_filt_gbr, aes(x = time, y = year_avg, color = subject))+
+  geom_line(size = 1)+
+  labs(x = "Year", y = "Measured in thousand of tonnes of carcass weight (average)", color = "Subject", title = "Amount of Chicken Consumed in the UK between 1990 and 2026")+
+  scale_x_continuous(
+    breaks = seq(1990, 2025, by = 5), 
+    minor_breaks = seq(1990, 2025, by = 1)) +
+  theme_bw()+
+  theme(axis.title.y = element_text(margin = margin(r = 10, l = 10), size = 14), 
+        axis.title.x = element_text(margin = margin(t = 10, b = 10), size = 14), 
+        legend.title = element_text(size = 14),
+        plot.title = element_text(margin = margin(t = 20, b = 20), hjust = 0.5, size = 20))
+
+# Again, filter for GBR but now for poultry, finding the average
+poultry_filt_gbr <- meat|>
+  group_by(subject, time)|>
+  filter(location == "GBR")|>
+  filter(subject == "POULTRY")|>
+  summarise(year_avg = mean(value))|>
+  ungroup()
+
+## Create a line plot which shows the average consumption per year
+ggplot(poultry_filt_gbr, aes(x = time, y = year_avg, color = subject))+
+  geom_line(size = 1)+
+  labs(x = "Year", y = "Ready-to-cook weight (average)", color = "Subject", title = "Amount of Chicken Consumed in the UK between 1990 and 2026")+
+  scale_x_continuous(
+    breaks = seq(1990, 2025, by = 1), 
+    minor_breaks = seq(1990, 2025, by = 1)) +
+  theme_bw()+
+  theme(axis.title.y = element_text(margin = margin(r = 10, l = 10), size = 14), 
+        axis.title.x = element_text(margin = margin(t = 10, b = 10), size = 14), 
+        legend.title = element_text(size = 14),
+        plot.title = element_text(margin = margin(t = 20, b = 20), hjust = 0.5, size = 20))
+
